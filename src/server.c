@@ -10,9 +10,19 @@
 #include <unistd.h>
 #include <arpa/inet.h> 
 #include <netdb.h>
-#include "picoev/picoev.h"
+//#include "picoev/picoev.h"
 
 #include "http_parser/http_parser.h"
+
+#ifdef HAVE_EPOLL
+#include "picoev/picoev_epoll.c"
+#else
+    #ifdef HAVE_KQUEUE
+    #include "picoev/picoev_kqueue.c"
+    #else
+    #include "picoev/picoev_select.c"
+    #endif
+#endif
 
 #define MAX_FDS 1024 * 4
 #define TIMEOUT_SECS 60
