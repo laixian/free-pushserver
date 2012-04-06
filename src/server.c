@@ -14,8 +14,6 @@
 
 #include "http_parser/http_parser.h"
 
-#define HOST 0 /* 0x7f000001 for localhost */
-#define PORT 8080
 #define MAX_FDS 1024 * 4
 #define TIMEOUT_SECS 60
 #define BACKLOG_SIZE 1024 * 5
@@ -191,41 +189,37 @@ create_and_bind (char *port)
 	  return sfd;
 }
 
-int main(void)
+int main(int argc, char *argv[])
 {
-  picoev_loop* loop;
-  int listen_sock, flag;
-  /* listen to port */
-  assert((listen_sock = socket(AF_INET, SOCK_STREAM, 0)) != -1);
-  flag = 1;
-  assert(setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag))
-	 == 0);
-  //struct sockaddr_in listen_addr;
-  //listen_addr.sin_family = AF_INET;
-  //listen_addr.sin_port = htons(PORT);
-  //listen_addr.sin_addr.s_addr = htonl(HOST);
-  //assert(bind(listen_sock, (struct sockaddr*)&listen_addr, sizeof(listen_addr)) == 0);
-  	listen_sock = create_and_bind("8080");
+	picoev_loop* loop;
+	int listen_sock, flag;
+	/* listen to port */
+	assert((listen_sock = socket(AF_INET, SOCK_STREAM, 0)) != -1);
+	flag = 1;
+	assert(setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag)) == 0);
+	char *listen_port = "8080";
+	if(argc > 1 && strlen(argv[1]) > 0)
+		listen_port = argv[1];
+	listen_sock = create_and_bind(listen_port);
 	if(listen_sock == -1)
 	{
 		fprintf(stderr, "Could not bind");
 	}
 	assert(listen(listen_sock, BACKLOG_SIZE) == 0);
-  setup_sock(listen_sock);
-  
-  /* init picoev */
-  picoev_init(MAX_FDS);
-  /* create loop */
-  loop = picoev_create_loop(60);
-  /* add listen socket */
-  picoev_add(loop, listen_sock, PICOEV_READ, 0, accept_callback, NULL);
-  /* loop */
-  while (1) {
-    picoev_loop_once(loop, 10);
-  }
-  /* cleanup */
-  picoev_destroy_loop(loop);
-  picoev_deinit();
-  
-  return 0;
+	setup_sock(listen_sock);
+	/* init picoev */
+	picoev_init(MAX_FDS);
+	/* create loop */
+	loop = picoev_create_loop(60);
+	/* add listen socket */
+	picoev_add(loop, listen_sock, PICOEV_READ, 0, accept_callback, NULL);
+	/* loop */
+	while (1) {
+		picoev_loop_once(loop, 10);
+	}
+	/* cleanup */
+	picoev_destroy_loop(loop);
+	picoev_deinit();
+	  
+	return 0;
 }
