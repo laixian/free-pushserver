@@ -9,6 +9,7 @@
 #include <sys/uio.h>
 #include <unistd.h>
 #include <arpa/inet.h> 
+#include <netdb.h>
 #include "picoev/picoev.h"
 
 #include "http_parser/http_parser.h"
@@ -144,6 +145,52 @@ static void accept_callback(picoev_loop* loop, int fd, int events, void* cb_arg)
   	}
 }
 
+static int
+create_and_bind (char *port)
+{
+	  struct addrinfo hints;
+	  struct addrinfo *result, *rp;
+	  int s, sfd;
+
+	  memset (&hints, 0, sizeof (struct addrinfo));
+	  hints.ai_family = AF_UNSPEC;     /* Return IPv4 and IPv6 choices */
+	  hints.ai_socktype = SOCK_STREAM; /* We want a TCP socket */
+	  hints.ai_flags = AI_PASSIVE;     /* All interfaces */
+
+	  s = getaddrinfo (NULL, port, &hints, &result);
+	  if (s != 0)
+		{
+		  fprintf (stderr, "getaddrinfo: %s\n", gai_strerror (s));
+		  return -1;
+		}
+
+	  for (rp = result; rp != NULL; rp = rp->ai_next)
+		{
+		  sfd = socket (rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+		  if (sfd == -1)
+			continue;
+
+		  s = bind (sfd, rp->ai_addr, rp->ai_addrlen);
+		  if (s == 0)
+			{
+			  /* We managed to bind successfully! */
+			  break;
+			}
+
+		  close (sfd);
+		}
+
+	  if (rp == NULL)
+		{
+		  fprintf (stderr, "Could not bind\n");
+		  return -1;
+		}
+
+	  freeaddrinfo (result);
+
+	  return sfd;
+}
+
 int main(void)
 {
   picoev_loop* loop;
@@ -153,13 +200,17 @@ int main(void)
   flag = 1;
   assert(setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag))
 	 == 0);
-  struct sockaddr_in listen_addr;
-  listen_addr.sin_family = AF_INET;
-  listen_addr.sin_port = htons(PORT);
-  listen_addr.sin_addr.s_addr = htonl(HOST);
-  assert(bind(listen_sock, (struct sockaddr*)&listen_addr, sizeof(listen_addr))
-	 == 0);
-  assert(listen(listen_sock, BACKLOG_SIZE) == 0);
+  //struct sockaddr_in listen_addr;
+  //listen_addr.sin_family = AF_INET;
+  //listen_addr.sin_port = htons(PORT);
+  //listen_addr.sin_addr.s_addr = htonl(HOST);
+  //assert(bind(listen_sock, (struct sockaddr*)&listen_addr, sizeof(listen_addr)) == 0);
+  	listen_sock = create_and_bind("8080");
+	if(listen_sock == -1)
+	{
+		fprintf(stderr, "Could not bind");
+	}
+	assert(listen(listen_sock, BACKLOG_SIZE) == 0);
   setup_sock(listen_sock);
   
   /* init picoev */
